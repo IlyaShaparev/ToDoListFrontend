@@ -4,14 +4,13 @@
   <table>
     <thead>
       <tr>
-        <th>Номер задачи</th>
-        <th>Статус</th>
-        <th>Название</th>
-        <th>Описание</th>
-        <th>Время создания</th>
-        <th>Приоритет</th>
-        <th>Время завершения</th>
-        <th>Быстрые действия</th>
+        <th @click="calculateSort('id')">Номер задачи</th>
+        <th @click="calculateSort('is_closed')">Статус</th>
+        <th @click="calculateSort('title')">Название</th>
+        <th @click="calculateSort('description')">Описание</th>
+        <th @click="calculateSort('created_time')">Время создания</th>
+        <th @click="calculateSort('priority')">Приоритет</th>
+        <th @click="calculateSort('closed_time')">Время завершения</th>
       </tr>
     </thead>
     <tbody v-if="!loading && tasks.length > 0">
@@ -33,16 +32,26 @@
       </tr>
       <tr v-if="!isAllTasks">
         <td colspan="7" align="center">
-          <button>Показать с только открытые</button>
-          <button>Показать с только закрытые</button>
-          <button>Показать только с приоритетом 5 и выше</button>
-          <button>Показать только с приоритетом ниже 5</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'status=-1')">Показать с только открытые</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'status=1')">Показать с только закрытые</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'priority=+5')">Показать только с приоритетом 5 и выше</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'priority=-5')">Показать только с приоритетом ниже 5</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, false)">Показать все</button>
         </td>
       </tr>
     </tbody>
     <tbody v-else-if="!loading && tasks.length <= 0">
       <tr>
         <td colspan="7" align="center">У вас нет ни одной задачи</td>
+      </tr>
+      <tr v-if="!isAllTasks">
+        <td colspan="7" align="center">
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'status=-1')">Показать с только открытые</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'status=1')">Показать с только закрытые</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'priority=+5')">Показать только с приоритетом 5 и выше</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, 'priority=-5')">Показать только с приоритетом ниже 5</button>
+          <button v-if="!isAllTasks" @click="refreshTasks(currentSort, '')">Показать все</button>
+        </td>
       </tr>
     </tbody>
     <tbody v-else-if="loading">
@@ -113,6 +122,11 @@
   });
   const commentsOpen = ref(false);
   const commentsCreateOpen = ref(false);
+  const currentSort = ref({
+    type: '',
+    direction: ''
+  })
+  const currentFilter = ref('')
 
   const headers = {
     'Content-Type': 'application/json',
@@ -137,7 +151,7 @@
     'task_id': 0,
   })
 
-  const refreshTasks = () => {
+  const refreshTasks = (sort = false, filter = false) => {
     if (props.isAllTasks) {
       axios.get('/api/tasks/show',  {headers} ).then((response) => {
         if(response.status === 200) {
@@ -147,7 +161,28 @@
         }
       })
     } else {
-      axios.get('/api/tasks',  {headers}).then((response) => {
+      let url = '/api/tasks';
+      let isFirst = true;
+
+      if(sort || filter) {
+        url += '?'
+      }
+
+      if(sort) {
+        url += 'sort=' + sort.direction + sort.type;
+        isFirst = false;
+      }
+
+      currentFilter.value = filter;
+      if(filter) {
+        if(isFirst) {
+          url += filter
+        } else {
+          url += '&' + filter;
+        }
+      }
+
+      axios.get(url,  {headers}).then((response) => {
         if(response.status === 200) {
           tasks.value = response.data.tasks;
           comments.value = response.data.comments;
@@ -268,6 +303,21 @@
         refreshTasks();
       }
     })
+  }
+
+  const calculateSort = (type) => {
+    if(currentSort.value.type === '') {
+      currentSort.value.type = type;
+      currentSort.value.direction = '-';
+    } else if(currentSort.value?.type === type) {
+      currentSort.value.type = type;
+      currentSort.value.direction = currentSort.value.direction === '-' ? '' : '-';
+    } else {
+      currentSort.value.type = type;
+      currentSort.value.direction = '-';
+    }
+
+    refreshTasks(currentSort.value, currentFilter.value);
   }
 
   refreshTasks();
